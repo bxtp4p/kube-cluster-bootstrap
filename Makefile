@@ -21,9 +21,9 @@ shutdown-k8s: ## Shutdown Kubernetes cluster
 deploy-argocd: ## Deploy Argo CD on Kubernetes cluster
 	helm repo add argo https://argoproj.github.io/argo-helm
 	helm repo update
-	helm install --create-namespace --namespace argocd argocd argo/argo-cd
+	# helm install --create-namespace --namespace argocd argocd argo/argo-cd
 	kubectl -n argocd wait --for=condition=available --timeout=300s --all deployments
-	kustomize build ./manifests/applications | kubectl apply -f -
+	kubectl kustomize ./manifests/applications | kubectl apply -f -
         # enable Argo CD metrics Service and ServiceMonitor
 	helm upgrade -f ./manifests/argocd/values.yaml --namespace argocd argocd argo/argo-cd
 	kubectl -n argocd wait --for=condition=available --timeout=300s --all deployments
@@ -31,7 +31,7 @@ deploy-argocd: ## Deploy Argo CD on Kubernetes cluster
 .PHONY: sync-applications
 sync-applications: ## Sync Applications
 	# sort applications by sync-wave annotation
-	$(eval APPS := $(shell kustomize build ./manifests/applications/ | yq ea [.] -o json | jq -r '. | sort_by(.metadata.annotations."argocd.argoproj.io/sync-wave" // "0" | tonumber) | .[] | .metadata.name'))
+	$(eval APPS := $(shell kubectl kustomize ./manifests/applications/ | yq ea [.] -o json | jq -r '. | sort_by(.metadata.annotations."argocd.argoproj.io/sync-wave" // "0" | tonumber) | .[] | .metadata.name'))
 	for app in $(APPS); do \
 		argocd app sync $$app --retry-limit 3 --timeout 300; \
 		argocd app wait $$app --timeout 300; \
@@ -42,7 +42,7 @@ sync-applications: ## Sync Applications
 .PHONY: local-sync-applications
 local-sync-applications: ## Sync Applications with local manifests
 	# sort applications by sync-wave annotation
-	$(eval APPS := $(shell kustomize build ./manifests/applications/ | yq ea [.] -o json | jq -r '. | sort_by(.metadata.annotations."argocd.argoproj.io/sync-wave" // "0" | tonumber) | .[] | .metadata.name'))
+	$(eval APPS := $(shell kubectl kustomize ./manifests/applications/ | yq ea [.] -o json | jq -r '. | sort_by(.metadata.annotations."argocd.argoproj.io/sync-wave" // "0" | tonumber) | .[] | .metadata.name'))
 	for app in $(APPS); do \
 		if [ $$app = "namespaces" ] || [ $$app = "monitoring" ] || [ $$app = "sandbox" ]; then \
 			argocd app sync $$app --local=./manifests/$$app --retry-limit 3 --timeout 300; \
